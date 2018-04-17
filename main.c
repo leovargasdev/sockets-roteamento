@@ -24,7 +24,7 @@ void lerRoteadores(roteador *first){
         exit(1);
     }
     char buf[100], *campo, delimita[] = " ";
-    int quant = 0;
+    quant = 0;
     while(fgets(buf, 100, arquivo) != NULL){
         roteador *nodo = (roteador *) malloc(sizeof(roteador));
 
@@ -39,11 +39,38 @@ void lerRoteadores(roteador *first){
     }
 }
 
+void criaGrafo(int m[quant][quant]){
+    for (int i = 0; i < quant; i++)
+        for (int h = 0; h < quant; h++)
+            m[i][h] = 0;
+    FILE *arquivo = fopen("enlaces.config","r");
+    if(!arquivo){
+        printf("ERRO!!! Não foi possivel abrir o arquivo\n");
+        exit(1);
+    }
+    char buf[100], delimita[] = " ";
+    int n1 = 0, n2 = 0, c = 0;
+    while(fgets(buf, 100, arquivo) != NULL){
+        n1 = atoi(strtok(buf, delimita)) - 1;
+        n2 = atoi(strtok(NULL, delimita)) - 1;
+        c = atoi(strtok(NULL, delimita));
+        m[n1][n2] = c;
+        m[n2][n1] = c;
+    }
+    for (int i = 0; i < quant; i++){
+        for (int h = 0; h < quant; h++)
+            printf("%4d |", m[i][h]);
+        printf("\n");
+    }
+}
+
 int main(){
     roteador *first = (roteador *) malloc(sizeof(roteador));
     lerRoteadores(first);
-	for(roteador *p = first->prox; p != NULL; p = p->prox)
-		printf("%5d", p->id);
-    printf("\n");
+	// for(roteador *p = first->prox; p != NULL; p = p->prox)
+		// printf("%5d", p->id);
+	// printf("\n");
+    int matrix[quant][quant];
+    criaGrafo(matrix);
     return 0;
 }
