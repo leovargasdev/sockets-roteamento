@@ -2,59 +2,48 @@
 #include <stdlib.h>
 #include <string.h>
 int quant;
-struct roteador{
+
+struct Router{
     int id;
     int porta;
 	char ip[100];
+	struct Router *prox;
 };
 
-struct roteador * lerRoteadores(){
-    char buf[100];
-    char *campo;
-    char delimita[] = " ";
-    int a, quant = 0;
+typedef struct Router roteador;
+
+void criaNodo(roteador *f, roteador *n){
+    if(f->prox == NULL) f->prox = n;
+    else criaNodo(f->prox, n);
+}
+
+void lerRoteadores(roteador *first){
     FILE *arquivo = fopen("roteador.config","r");
     if(!arquivo){
         printf("ERRO!!! Não foi possivel abrir o arquivo\n");
-        return NULL;
+        exit(1);
     }
+    char buf[100], *campo, delimita[] = " ";
+    int quant = 0;
     while(fgets(buf, 100, arquivo) != NULL){
-        strtok(buf, "\n");
+        roteador *nodo = (roteador *) malloc(sizeof(roteador));
+
+        nodo->id = atoi(strtok(buf, delimita));
+        nodo->porta = atoi(strtok(NULL, delimita));
+        campo = strtok(NULL, delimita);
+        strcpy(nodo->ip, campo);
+        nodo->prox = NULL;
+
+        criaNodo(first, nodo);
         quant++;
     }
-
-    arquivo = fopen("roteador.config","r");
-    struct roteador *roteadores=(struct roteador*) malloc(sizeof(struct roteador)*quant);
-
-    while(fgets(buf, 100, arquivo) != NULL){
-        roteadores[a].id = atoi(strtok(buf, delimita));
-
-        roteadores[a].porta = atoi(strtok(NULL, delimita));
-
-        campo = strtok(NULL, delimita);
-        strcpy(roteadores[a].ip, campo);
-
-        printf("id: %d\n", roteadores[a].id);
-        printf("porta: %d\n", roteadores[a].porta);
-        printf("ip: %s\n", roteadores[a].ip);
-        a++;
-    }
-    return roteadores;
-}
-
-void criaMatrix(int m[quant][quant]){
-    m[0][0] = 124;
 }
 
 int main(){
-    struct roteador *r;
-    r = lerRoteadores();
-    int matrix[quant][quant];
-    for(int a = 0; a < quant; a++)
-        for(int k = 0; k < quant; k++)
-            matrix[a][k] = 0;
-    criaMatrix(matrix);
-    printf("%d\n", matrix[0][0]);
-    free(r);
+    roteador *first = (roteador *) malloc(sizeof(roteador));
+    lerRoteadores(first);
+	for(roteador *p = first->prox; p != NULL; p = p->prox)
+		printf("%5d", p->id);
+    printf("\n");
     return 0;
 }
