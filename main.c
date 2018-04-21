@@ -14,6 +14,7 @@ struct Router{
     int id;
     int porta;
 	char ip[100];
+    int *tabela;
 	struct Router *prox;
 };
 
@@ -46,7 +47,7 @@ void lerRoteadores(roteador *first){
     }
 }
 
-void criaGrafo(int m[quant][quant]){
+void criaGrafo(int  m[quant][quant]){
     for (int i = 0; i < quant; i++)
         for (int h = 0; h < quant; h++)
             m[i][h] = 0;
@@ -72,10 +73,12 @@ void criaGrafo(int m[quant][quant]){
     // }
 }
 
-void dijstra(int v, int matrix[quant][quant], int visitados[quant], int result[quant][2]){
+void dijstra(int v, int matrix[][quant], int result[][2]){
+    int visitados[quant];
+    for(int g = 0; g < quant; g++)
+        result[g][1] = result[g][0] = visitados[g] = 0;
     int a = 0, aux, auxTotal;
     do{
-        printf("Vertice -> %d\n\n", v+1);
         aux = 1234567;
         visitados[v] = 1;
         for(a = 0; a < quant; a++){ // fazendo o somatorio na tabela
@@ -99,37 +102,40 @@ void dijstra(int v, int matrix[quant][quant], int visitados[quant], int result[q
 void tabelaDijs(int result[quant][2]){
     printf("Vertices            : ");
     for(int g = 0; g < quant; g++)
-        printf("%3d  |", g);
+        printf("%3d  |", g+1);
     printf("\nVertices anteriores : ");
     for(int g = 0; g < quant; g++)
-        printf("%3d  |", result[g][0]);
+        printf("%3d  |", result[g][0]+1);
     printf("\nTotal               : ");
     for(int g = 0; g < quant; g++)
         printf("%3d  |", result[g][1]);
     printf("\n\n -------------------- \n\n");
-    return;
 }
 
 int main(){
     roteador *first = (roteador *) malloc(sizeof(roteador));
     lerRoteadores(first);
     int matrix[quant][quant], result[quant][2];
-    int visitados[quant];
-    int origem, destino;
+    int origem, destino, prox;
     criaGrafo(matrix);
-    printf("Selecionar roteador: ");
+    printf("Origem: ");
     scanf("%d", &origem);
-    dijstra(origem, matrix, visitados, result);
+    for(roteador *p = first->prox; p != NULL; p = p->prox)
+        printf("roteador: %d porta: %d ip: %s", p->id, p->porta, p->ip);
+		// if(p->id == origem)
+    dijstra(origem, matrix, result);
+    tabelaDijs(result);
     do{
-        printf("Selecionar roteador destino[9 = sair]:");
+        printf("[SAIR = 9]Destino: ");
         scanf("%d", &destino);
         printf("Custo: %d\nCaminho: ", result[destino][1]);
-        int v = destino;
-        // while(1){
-        //     printf("%d <-- ", v+1);
-        //     v = result[v][0];
-        //     if(v == 0) break;
-        // }
+        while(1){
+            printf("%d <-- ", destino+1);
+            destino = result[destino][0];
+            if(destino == 0) break;
+            prox = destino;
+        }
     }while(destino != 9);
+    free(first);
     return 0;
 }

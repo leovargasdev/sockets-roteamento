@@ -1,29 +1,27 @@
 // ALGORITMO DIJKSTRA:
 #include <stdio.h>
 #include <stdbool.h>
-#define chinelo 7 //numero de vertices
-#define vInicial 0
-#define vBusca 6
+#define chinelo 6 //numero de vertices
+#define vInicial 2
+#define vBusca 0
 int visitados[chinelo];
 int matrix[chinelo][chinelo] = {
-                                {0,7,0,5,0,0,0},
-                                {7,0,8,9,7,0,0},
-                                {0,8,0,0,5,0,0},
-                                {5,9,0,0,15,6,0},
-                                {0,7,5,15,0,8,7},
-                                {0,0,0,6,8,0,11},
-                                {0,0,0,0,7,11,0}};
-char vertices[chinelo] = {'a','b','c','d','e','f','g'};
+                                { 0, 10, 15, 0, 0, 0},
+                                { 10, 0, 0, 2, 5, 0},
+                                { 15, 0, 0, 2, 0, 0},
+                                { 0, 2, 2, 0, 0, 10},
+                                { 0, 5, 0, 0, 0, 5},
+                                { 0, 0, 0, 10, 5, 0}};
 int result[chinelo][2];
 // Linha 1: vertice anterior.
 // Linha 2: total.
 void tabelaDijs(){
     printf("Vertices            : ");
     for(int g = 0; g < chinelo; g++)
-        printf("%3c  |", vertices[g]);
+        printf("%3d  |", g+1);
     printf("\nVertices anteriores : ");
     for(int g = 0; g < chinelo; g++)
-        printf("%3c  |", vertices[result[g][0]]);
+        printf("%3d  |", result[g][0]+1);
     printf("\nTotal               : ");
     for(int g = 0; g < chinelo; g++)
         printf("%3d  |", result[g][1]);
@@ -33,7 +31,7 @@ void tabelaDijs(){
 void dijstraAdjacencia(int v) {
     int a = 0, aux, auxTotal;
     do{
-        printf("Vertice -> %c\n\n", vertices[v]);
+        // printf("Vertice -> %d\n\n", v+1);
         aux = 1234567;
         visitados[v] = 1;
         for(a = 0; a < chinelo; a++){ // fazendo o somatorio na tabela
@@ -43,7 +41,7 @@ void dijstraAdjacencia(int v) {
                 result[a][1] = auxTotal;
             }
         }
-        tabelaDijs();
+        // tabelaDijs();
         for(a = 0; a < chinelo; a++) // buscando o vertice com o menor total e não visitado ainda
             if(visitados[a] != 1)
                 if(result[a][1] < aux && result[a][1] > 0){
@@ -57,14 +55,21 @@ int main(){
     int g;
     for(g = 0; g < chinelo; g++)
         result[g][1] = result[g][0] = visitados[g] = 0;
-    dijstraAdjacencia(vInicial);
-    printf("Vertice a ser buscado: %c\nCusto: %d\nCaminho: ", vertices[vBusca], result[vBusca][1]);
-    int v = vBusca;
-    while(true){
-        printf("%c <-- ", vertices[v]);
-        v = result[v][0];
-        if(v == 0) break;
+    // dijstraAdjacencia(vInicial);
+    // // printf("Vertice origem: %d\nVertice destino: %d\nCusto: %d\nCaminho: ", vInicial+1, vBusca+1, result[vBusca][1]);
+    // int v = vBusca;
+    for(int a = 0; a < chinelo; a++){
+        for(int g = 0; g < chinelo; g++)
+            result[g][1] = result[g][0] = visitados[g] = 0;
+        dijstraAdjacencia(a);
+        printf("Vertice origem: %d\n", a+1);
+        tabelaDijs();
     }
-    printf("%c \n", vertices[v]);
+    // while(true){
+    //     printf("%d <-- ", v+1);
+    //     v = result[v][0];
+    //     if(v == 0) break;
+    // }
+    // printf("\n");
     return 0;
 }
