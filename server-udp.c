@@ -7,24 +7,26 @@
 #define BUFLEN 512  //Max length of buffer
 #define PORT 8888   //The port on which to listen for incoming data
 
+//mensagem de erro
 void die(char *s){
     perror(s);
     exit(1);
 }
 
 void main(void){
+    //endereço do socket do server e endereço do socket do client
     struct sockaddr_in si_me, si_other;
     int s, i, slen = sizeof(si_other) , recv_len;
     char buf[BUFLEN];
-    //create a UDP socket
+    //create a UDP socket server
     if ((s=socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) == -1)
         die("socket");
-    // zero out the structure
+    // zero out the structure serverAdrr structure
     memset((char *) &si_me, 0, sizeof(si_me));
-    si_me.sin_family = AF_INET;
-    si_me.sin_port = htons(PORT);
-    si_me.sin_addr.s_addr = htonl(INADDR_ANY);
-    //bind socket to port
+    si_me.sin_family = AF_INET; // for IPV4 internet protocol
+    si_me.sin_port = htons(PORT); // assign port on which server will listen
+    si_me.sin_addr.s_addr = htonl(INADDR_ANY); // any adress available on system
+    //bind socket to port, bind name e address to the socket
     if( bind(s , (struct sockaddr*)&si_me, sizeof(si_me) ) == -1)
         die("bind");
     //keep listening for data
