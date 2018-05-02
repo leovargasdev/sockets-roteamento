@@ -186,9 +186,10 @@ void *mandar(void *cli){
         otherRouter = readRouter('d');
         m->destino = otherRouter->id;
         if(otherRouter){
-            printf("\nMensagem: ");
-            scanf("%s",m->mensagem);
-            fflush(stdin);
+            printf("\nMensagem:");
+            //limpa buffer
+            setbuf(stdin,NULL);
+            fgets(m->mensagem,100,stdin);
             encaminhar(otherRouter, m);
         } else {
             printf("Digite um roteador válido\n");
