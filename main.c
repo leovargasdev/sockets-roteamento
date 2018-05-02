@@ -7,13 +7,13 @@
 #include <unistd.h>
 
 #define BUFLEN 100  //Max length of buffer
-
+#define PACOTE_TAM 108
 int quant;
 
 struct Mensage{   //Struct da mensagem para ser enviada
     int origem;
     int destino;
-    char message[100];
+    char mensagem[BUFLEN];
 }; typedef struct Mensage msg;
 
 struct Router{
@@ -117,9 +117,10 @@ roteador *getRouter(int r){
 }
 
 roteador *readRouter(char t){
-    t == 'o' ? printf("Origem:") : printf("Destino:");
+    t == 'o' ? printf("Origem: ") : printf("Destino: ");
     int router;
     scanf("%d", &router);
+    printf("\n");
     return getRouter(router);
 }
 
@@ -129,67 +130,66 @@ void die(char *s){
 }
 
 void *ouvir(void *ser){
-    printf("STAR SERVER\n");
+    printf("ouvindo...");
+    printf("\n");
+    msg *pRecebido = (msg *) malloc(sizeof(msg));
     struct sockaddr_in si_me, si_other;
-    int s, i, slen = sizeof(si_other) , recv_len;
-    char buf[BUFLEN];
+    int s, i, slen = sizeof(si_other), recv_len;
     if((s=socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) == -1)
         die("socket");
-    memset((char *) &si_me, 0, sizeof(si_me));
+    memset((msg *) &si_me, 0, sizeof(si_me));
     si_me.sin_family = AF_INET;
     si_me.sin_port = htons(myRouter->porta);
     si_me.sin_addr.s_addr = htonl(INADDR_ANY);
     if(bind(s, (struct sockaddr*)&si_me, sizeof(si_me)) == -1)
         die("bind"); // Mensagem de endereço já utilizado
     while(1){
-        printf("\nouvindo... \n\n");
         fflush(stdout);
-        memset(buf,'\0', BUFLEN);
-        if ((recv_len = recvfrom(s, buf, BUFLEN, 0, (struct sockaddr *) &si_other, &slen)) == -1)
+        memset(pRecebido,'\0', PACOTE_TAM);
+        if ((recv_len = recvfrom(s, pRecebido, PACOTE_TAM, 0, (struct sockaddr *) &si_other, &slen)) == -1)
             die("recvfrom()");
-        // if(pthread_mutex_lock(&mutex)==0){
-            printf("Mensagem recebida IP: %s, PORTA: %d\n", inet_ntoa(si_other.sin_addr), ntohs(si_other.sin_port));
-            printf("[MENSAGEM]: %s\n" , buf);
-        //     pthread_mutex_unlock(&mutex);
-        // }
-        if(sendto(s, buf, recv_len, 0, (struct sockaddr*) &si_other, slen) == -1)
+        printf("\nMensagem recebida IP: %s, PORTA: %d\n", inet_ntoa(si_other.sin_addr), ntohs(si_other.sin_port));
+        printf("[ORIGEM]: %d \t [DESTINO]: %d\n" , pRecebido->origem, pRecebido->destino);
+        printf("[MENSAGEM]: %s\n" , pRecebido->mensagem);
+        if(sendto(s, pRecebido, recv_len, 0, (struct sockaddr*) &si_other, slen) == -1)
             die("sendto()");
     }
+    free(pRecebido);
     close(s);
 }
 
-void encaminhar(roteador *r, char sms[BUFLEN]){
+void encaminhar(roteador *r, msg *pacote){
     struct sockaddr_in si_other;
     int s, i, slen=sizeof(si_other);
-    char buf[BUFLEN];
     if((s=socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) == -1)
         die("socket");
-    memset((char *) &si_other, 0, sizeof(si_other));
+    memset((msg *) &si_other, 0, sizeof(si_other));
     si_other.sin_family = AF_INET;
     si_other.sin_port = htons(r->porta);
     if(inet_aton(r->ip , &si_other.sin_addr) == 0){
         fprintf(stderr, "inet_aton() failed\n");
         exit(1);
     }
-    if(sendto(s, sms, strlen(sms), 0, (struct sockaddr *) &si_other, slen)==-1)
+    if(sendto(s, pacote, PACOTE_TAM, 0, (struct sockaddr *) &si_other, slen)==-1)
         die("sendto()");
-    memset(buf,'\0', BUFLEN);
-    if(recvfrom(s, buf, BUFLEN, 0, (struct sockaddr *) &si_other, &slen) == -1)
+    memset(pacote,'\0', PACOTE_TAM);
+    if(recvfrom(s, pacote, PACOTE_TAM, 0, (struct sockaddr *) &si_other, &slen) == -1)
         die("recvfrom()");
-    puts(buf);
     close(s);
 }
 
 void *mandar(void *cli){
-    printf("STAR CLIENT\n");
     roteador *otherRouter;
-    char message[BUFLEN];
+    msg *m = (msg *) malloc(sizeof(msg));
+    m->origem = myRouter->id;
     while (1){
         otherRouter = readRouter('d');
+        m->destino = otherRouter->id;
         if(otherRouter){
             printf("\nMensagem: ");
-            scanf("%s",message);
-            encaminhar(otherRouter, message);
+            scanf("%s",m->mensagem);
+            fflush(stdin);
+            encaminhar(otherRouter, m);
         } else {
             printf("Digite um roteador válido\n");
         }
@@ -207,6 +207,7 @@ int main(){
     }while (1);
     pthread_t t1, t2;
     pthread_create(&t1, NULL, ouvir, NULL);
+    sleep(2);
     pthread_create(&t2, NULL, mandar, NULL);
     pthread_join(t1, NULL);
     pthread_join(t2, NULL);
