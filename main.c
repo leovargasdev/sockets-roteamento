@@ -8,20 +8,22 @@
 
 #define BUFLEN 100  //Max length of buffer
 #define PACOTE_TAM 108
-int quant;
 
-struct Mensage{   //Struct da mensagem para ser enviada
+int quant;
+int *pm;
+
+struct PacoteDados{   //Struct da mensagem para ser enviada
     int origem;
     int destino;
     char mensagem[BUFLEN];
-}; typedef struct Mensage msg;
+}; typedef struct PacoteDados pacote;
 
 struct Router{
     int id;
     int porta;
     char ip[100];
-    int *tabela;
     struct Router *prox;
+    int tabela[][2];
 }; typedef struct Router roteador;
 
 roteador *myRouter, *first;
@@ -51,10 +53,10 @@ void lerRoteadores(){
     }
 }
 
-void criaGrafo(int  m[quant][quant]){
+void criaEnlaces(int m[quant][quant]){
     for (int i = 0; i < quant; i++)
-    for (int h = 0; h < quant; h++)
-    m[i][h] = 0;
+        for (int h = 0; h < quant; h++)
+            m[i][h] = 0;
     FILE *arquivo = fopen("./input/enlaces.config","r");
     if(!arquivo){
         printf("ERRO!!! Não foi possivel abrir o arquivo\n");
@@ -71,56 +73,63 @@ void criaGrafo(int  m[quant][quant]){
     }
 }
 
-void dijstra(int v, int matrix[][quant], int result[][2]){
-    int visitados[quant];
+void tabelaDijs(int result[quant][2]){
+    printf("\tVertices            : ");
     for(int g = 0; g < quant; g++)
-    result[g][1] = result[g][0] = visitados[g] = 0;
+    printf("%3d  |", g+1);
+    printf("\n\tVertices anteriores : ");
+    for(int g = 0; g < quant; g++)
+    printf("%3d  |", result[g][0]+1);
+    printf("\n\tTotal               : ");
+    for(int g = 0; g < quant; g++)
+    printf("%3d  |", result[g][1]);
+    printf("\n");
+}
+
+void *dijstra(roteador *r){
+    int matrix[quant][quant], visitados[quant];
+    int v = r->id - 1;
+    criaEnlaces(matrix);
+    for(int g = 0; g < quant; g++)
+        r->tabela[g][1] = r->tabela[g][0] = visitados[g] = 0;
     int a = 0, aux, auxTotal;
     do{
         aux = 1234567;
         visitados[v] = 1;
         for(a = 0; a < quant; a++){ // fazendo o somatorio na tabela
-            auxTotal = matrix[v][a] + result[v][1];
-            if(matrix[v][a] != 0 && visitados[a] != 1 && (result[a][1] == 0 || auxTotal < result[a][1])){
-                result[a][0] = v;
-                result[a][1] = auxTotal;
+            auxTotal = matrix[v][a] + r->tabela[v][1];
+            if(matrix[v][a] != 0 && visitados[a] != 1 && (r->tabela[a][1] == 0 || auxTotal < r->tabela[a][1])){
+                r->tabela[a][0] = v;
+                r->tabela[a][1] = auxTotal;
             }
         }
         for(a = 0; a < quant; a++) // buscando o vertice com o menor total e não visitado ainda
-        if(visitados[a] != 1)
-        if(result[a][1] < aux && result[a][1] > 0){
-            v = a;
-            aux = result[a][1];
-        }
-        if(visitados[v] == 1) return;
+            if(visitados[a] != 1)
+                if(r->tabela[a][1] < aux && r->tabela[a][1] > 0){
+                    v = a;
+                    aux = r->tabela[a][1];
+                }
+        if(visitados[v] == 1) break;
     }while(1);
-}
-
-void tabelaDijs(int result[quant][2]){
-    printf("Vertices            : ");
-    for(int g = 0; g < quant; g++)
-    printf("%3d  |", g+1);
-    printf("\nVertices anteriores : ");
-    for(int g = 0; g < quant; g++)
-    printf("%3d  |", result[g][0]+1);
-    printf("\nTotal               : ");
-    for(int g = 0; g < quant; g++)
-    printf("%3d  |", result[g][1]);
-    printf("\n\n -------------------- \n\n");
+    tabelaDijs(r->tabela);
 }
 
 roteador *getRouter(int r){
-    for(roteador *p = first->prox; p != NULL; p = p->prox)
-    if(p->id == r)
-    return p;
+    for(roteador *w = first->prox; w != NULL; w = w->prox){
+        if(w->id == r){
+            printf("[ID]: %d  [PORTA]: %d  [IP]: %s", w->id, w->porta, w->ip);
+            // printf("[TABELA]:\n");
+            // dijstra(w);
+            return w;
+        }
+    }
     return NULL;
 }
 
 roteador *readRouter(char t){
-    t == 'o' ? printf("Origem: ") : printf("Destino: ");
+    t == 'o' ? printf("Origem: ") : printf("\nDestino: ");
     int router;
     scanf("%d", &router);
-    printf("\n");
     return getRouter(router);
 }
 
@@ -130,70 +139,67 @@ void die(char *s){
 }
 
 void *ouvir(void *ser){
-    printf("ouvindo...");
-    printf("\n");
-    msg *pRecebido = (msg *) malloc(sizeof(msg));
+    pacote *pRecebido = (pacote *) malloc(sizeof(pacote));
     struct sockaddr_in si_me, si_other;
     int s, i, slen = sizeof(si_other), recv_len;
     if((s=socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) == -1)
-    die("socket");
-    memset((msg *) &si_me, 0, sizeof(si_me));
+        die("socket");
+    memset((pacote *) &si_me, 0, sizeof(si_me));
     si_me.sin_family = AF_INET;
     si_me.sin_port = htons(myRouter->porta);
     si_me.sin_addr.s_addr = htonl(INADDR_ANY);
     if(bind(s, (struct sockaddr*)&si_me, sizeof(si_me)) == -1)
-    die("bind"); // Mensagem de endereço já utilizado
+        die("bind"); // Mensagem de endereço já utilizado
     while(1){
         fflush(stdout);
         memset(pRecebido,'\0', PACOTE_TAM);
         if ((recv_len = recvfrom(s, pRecebido, PACOTE_TAM, 0, (struct sockaddr *) &si_other, &slen)) == -1)
-        die("recvfrom()");
+            die("recvfrom()");
         printf("\nMensagem recebida IP: %s, PORTA: %d\n", inet_ntoa(si_other.sin_addr), ntohs(si_other.sin_port));
         printf("[ORIGEM]: %d \t [DESTINO]: %d\n" , pRecebido->origem, pRecebido->destino);
         printf("[MENSAGEM]: %s\n" , pRecebido->mensagem);
         if(sendto(s, pRecebido, recv_len, 0, (struct sockaddr*) &si_other, slen) == -1)
-        die("sendto()");
+            die("sendto()");
     }
     free(pRecebido);
     close(s);
 }
 
-void encaminhar(roteador *r, msg *pacote){
+void encaminhar(roteador *r, pacote *pac){
     struct sockaddr_in si_other;
     int s, i, slen=sizeof(si_other);
     if((s=socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) == -1)
-    die("socket");
-    memset((msg *) &si_other, 0, sizeof(si_other));
+        die("socket");
+    memset((pacote *) &si_other, 0, sizeof(si_other));
     si_other.sin_family = AF_INET;
     si_other.sin_port = htons(r->porta);
     if(inet_aton(r->ip , &si_other.sin_addr) == 0){
         fprintf(stderr, "inet_aton() failed\n");
         exit(1);
     }
-    if(sendto(s, pacote, PACOTE_TAM, 0, (struct sockaddr *) &si_other, slen)==-1)
-    die("sendto()");
-    memset(pacote,'\0', PACOTE_TAM);
-    if(recvfrom(s, pacote, PACOTE_TAM, 0, (struct sockaddr *) &si_other, &slen) == -1)
-    die("recvfrom()");
+    if(sendto(s, pac, PACOTE_TAM, 0, (struct sockaddr *) &si_other, slen)==-1)
+        die("sendto()");
+    memset(pac,'\0', PACOTE_TAM);
+    if(recvfrom(s, pac, PACOTE_TAM, 0, (struct sockaddr *) &si_other, &slen) == -1)
+        die("recvfrom()");
     close(s);
 }
 
 void *mandar(void *cli){
     roteador *otherRouter;
-    msg *m = (msg *) malloc(sizeof(msg));
-    m->origem = myRouter->id;
+    pacote *p = (pacote *) malloc(sizeof(pacote));
+    p->origem = myRouter->id;
     while (1){
         int nextRoute;
         otherRouter = readRouter('d');
         //nextRoute = definirProximoRoteador(myRouter->id,otherRouter->id);
         //printf("Deve ir para o %d\n",nextRoute);
-        m->destino = otherRouter->id;
+        p->destino = otherRouter->id;
         if(otherRouter){
-            printf("\nMensagem:");
-            //limpa buffer
-            setbuf(stdin,NULL);
-            fgets(m->mensagem,100,stdin);
-            encaminhar(otherRouter, m);
+            printf("Mensagem: ");
+            setbuf(stdin,NULL); //limpa buffer
+            fgets(p->mensagem, BUFLEN, stdin);
+            encaminhar(otherRouter, p);
         } else {
             printf("Digite um roteador válido\n");
         }
@@ -201,24 +207,23 @@ void *mandar(void *cli){
     free(otherRouter);
 }
 
-int definirProximoRoteador(int start,int end) {
-    int matrix[quant][quant], result[quant][2];
-    criaGrafo(matrix);
-    dijstra(start-1, matrix, result);
-    tabelaDijs(result);
-    int next = end-1,prox;
-    printf("Custo: %d\nCaminho: ", result[next][1]);
-    while(1){
-        printf("%d <-- ", next+1);
-        prox = next;
-        next = result[next][0];
-        //printf("--%d-",next);
-        if(next == 0) break;
-    }
-    //printf("o nodos anterior e:%d\n",prox+1 );
-    prox++;
-    return prox;
-}
+// int definirProximoRoteador(int start, int end){
+//     dijstra(start-1, matrix, result);
+//     tabelaDijs(result);
+//     int next = end-1,prox;
+//     printf("Custo: %d\nCaminho: ", result[next][1]);
+//     while(1){
+//         printf("%d <-- ", next+1);
+//         prox = next;
+//         next = result[next][0];
+//         //printf("--%d-",next);
+//         if(next == 0) break;
+//     }
+//     //printf("o nodos anterior e:%d\n",prox+1 );
+//     prox++;
+//     return prox;
+// }
+
 int main(){
     first = (roteador *) malloc(sizeof(roteador));
     lerRoteadores();
@@ -229,7 +234,7 @@ int main(){
     }while (1);
     pthread_t t1, t2;
     pthread_create(&t1, NULL, ouvir, NULL);
-    sleep(2);
+    sleep(0.5);
     pthread_create(&t2, NULL, mandar, NULL);
     pthread_join(t1, NULL);
     pthread_join(t2, NULL);
