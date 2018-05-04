@@ -54,8 +54,8 @@ void lerRoteadores(){
 
 void criaEnlaces(int m[quant][quant]){
     for (int i = 0; i < quant; i++)
-        for (int h = 0; h < quant; h++)
-            m[i][h] = 0;
+    for (int h = 0; h < quant; h++)
+    m[i][h] = 0;
     FILE *arquivo = fopen("./input/enlaces.config","r");
     if(!arquivo){
         printf("ERRO!!! Não foi possivel abrir o arquivo\n");
@@ -90,7 +90,7 @@ void dijstra(int tabela[quant][2]){
     int v = (myRouter->id-1);
     criaEnlaces(matrix);
     for(int g = 0; g < quant; g++)
-        tabela[g][1] = tabela[g][0] = visitados[g] = 0;
+    tabela[g][1] = tabela[g][0] = visitados[g] = 0;
     int a = 0, aux, auxTotal;
     do{
         aux = 1234567;
@@ -103,11 +103,11 @@ void dijstra(int tabela[quant][2]){
             }
         }
         for(a = 0; a < quant; a++) // buscando o vertice com o menor total e não visitado ainda
-            if(visitados[a] != 1)
-                if(tabela[a][1] < aux && tabela[a][1] > 0){
-                    v = a;
-                    aux = tabela[a][1];
-                }
+        if(visitados[a] != 1)
+        if(tabela[a][1] < aux && tabela[a][1] > 0){
+            v = a;
+            aux = tabela[a][1];
+        }
         if(visitados[v] == 1) return;
     }while(1);
 }
@@ -137,16 +137,26 @@ void die(char *s){
 }
 
 roteador *proximoSalto(int dest){
-    int tabela[quant][2];
+    int tabela[quant][2],proxId,count = dest - 1;
     dijstra(tabela);
-    printf("%d\n", dest);
+    tabelaDijs(tabela);
+    printf("Custo: %d \n",tabela[count][1] );
+    while(1) {
+        printf("%d <<",count+1);
+        count = tabela[count][0];
+        printf("(%d-%d)",count+1,tabela[count][0]+1);
+        proxId = count;
+        if(tabela[count][0] == 0 && count != myRouter->id-1 ) break;
+    }
+    proxId += 1;
+    printf("\n%d-%d\n", dest,proxId);
 }
 
 void encaminhar(roteador *r, pacote *pac){
     struct sockaddr_in si_other;
     int s, i, slen=sizeof(si_other);
     if((s=socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) == -1)
-        die("socket");
+    die("socket");
     memset((pacote *) &si_other, 0, sizeof(si_other));
     si_other.sin_family = AF_INET;
     si_other.sin_port = htons(r->porta);
@@ -155,10 +165,10 @@ void encaminhar(roteador *r, pacote *pac){
         exit(1);
     }
     if(sendto(s, pac, PACOTE_TAM, 0, (struct sockaddr *) &si_other, slen)==-1)
-        die("sendto()");
+    die("sendto()");
     memset(pac,'\0', PACOTE_TAM);
     if(recvfrom(s, pac, PACOTE_TAM, 0, (struct sockaddr *) &si_other, &slen) == -1)
-        die("recvfrom()");
+    die("recvfrom()");
     close(s);
 }
 
@@ -169,6 +179,7 @@ void *mandar(void *cli){
     while (1){
         otherRouter = readRouter('d');
         p->destino = otherRouter->id;
+        proximoSalto(otherRouter->id);
         if(otherRouter){
             printf("Mensagem: ");
             setbuf(stdin, NULL); //limpa buffer
@@ -186,18 +197,18 @@ void *ouvir(void *ser){
     struct sockaddr_in si_me, si_other;
     int s, i, slen = sizeof(si_other), recv_len;
     if((s=socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) == -1)
-        die("socket");
+    die("socket");
     memset((pacote *) &si_me, 0, sizeof(si_me));
     si_me.sin_family = AF_INET;
     si_me.sin_port = htons(myRouter->porta);
     si_me.sin_addr.s_addr = htonl(INADDR_ANY);
     if(bind(s, (struct sockaddr*)&si_me, sizeof(si_me)) == -1)
-        die("bind"); // Mensagem de endereço já utilizado
+    die("bind"); // Mensagem de endereço já utilizado
     while(1){
         fflush(stdout);
         memset(pRecebido,'\0', PACOTE_TAM);
         if ((recv_len = recvfrom(s, pRecebido, PACOTE_TAM, 0, (struct sockaddr *) &si_other, &slen)) == -1)
-            die("recvfrom()");
+        die("recvfrom()");
         if(pRecebido->destino == myRouter->id){
             printf("\n\n *** DESTINO FINAL!!! ***\n");
             printf("\nMensagem recebida IP: %s, PORTA: %d\n", inet_ntoa(si_other.sin_addr), ntohs(si_other.sin_port));
@@ -207,7 +218,7 @@ void *ouvir(void *ser){
             proximoSalto(pRecebido->destino);
         }
         if(sendto(s, pRecebido, recv_len, 0, (struct sockaddr*) &si_other, slen) == -1)
-            die("sendto()");
+        die("sendto()");
     }
     free(pRecebido);
     close(s);
