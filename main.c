@@ -137,7 +137,7 @@ void die(char *s){
 }
 
 roteador *proximoSalto(int dest){
-    int tabela[quant][2],proxId,count = dest - 1;
+    int tabela[quant][2],proxId = -1,count = dest - 1;
     dijstra(tabela);
     tabelaDijs(tabela);
     //printf("Custo: %d \n",tabela[count][1] );
@@ -148,8 +148,13 @@ roteador *proximoSalto(int dest){
         if(tabela[count][0] == 0 && (count == (myRouter->id-1)) ) break;
         proxId = count;
     }
-    proxId += 1;
+    if(proxId == -1) {
+        proxId = dest;
+    }else{
+        proxId += 1;
+    }
     printf("\nDestino %d- Está indo para %d\n", dest,proxId);
+    return getRouter(proxId);
 }
 
 void encaminhar(roteador *r, pacote *pac){
