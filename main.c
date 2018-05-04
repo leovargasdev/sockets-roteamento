@@ -140,16 +140,16 @@ roteador *proximoSalto(int dest){
     int tabela[quant][2],proxId,count = dest - 1;
     dijstra(tabela);
     tabelaDijs(tabela);
-    printf("Custo: %d \n",tabela[count][1] );
+    //printf("Custo: %d \n",tabela[count][1] );
     while(1) {
-        printf("%d <<",count+1);
+        //printf("%d <<",count+1);
         count = tabela[count][0];
-        printf("(%d-%d)",count+1,tabela[count][0]+1);
+        //printf("(%d-%d)",count+1,tabela[count][0]+1);
+        if(tabela[count][0] == 0 && (count == (myRouter->id-1)) ) break;
         proxId = count;
-        if(tabela[count][0] == 0 && count != myRouter->id-1 ) break;
     }
     proxId += 1;
-    printf("\n%d-%d\n", dest,proxId);
+    printf("\nDestino %d- Está indo para %d\n", dest,proxId);
 }
 
 void encaminhar(roteador *r, pacote *pac){
