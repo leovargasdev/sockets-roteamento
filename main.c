@@ -15,11 +15,13 @@ struct PacoteDados{   //Struct da mensagem para ser enviada
     int origem;
     int destino;
     char mensagem[BUFLEN];
+    int numMessageRouter;
 }; typedef struct PacoteDados pacote;
 
 struct Router{
     int id;
     int porta;
+    int numMessage;
     char ip[100];
     struct Router *prox;
     int tabela[][2];
@@ -46,6 +48,7 @@ void lerRoteadores(){
         nodo->porta = atoi(strtok(NULL, delimita));
         campo = strtok(NULL, delimita);
         strcpy(nodo->ip, campo);
+        nodo->numMessage = 0;
         nodo->prox = NULL;
         criaNodo(first, nodo);
         quant++;
@@ -181,6 +184,9 @@ void *mandar(void *cli){
     roteador *otherRouter;
     pacote *p = (pacote *) malloc(sizeof(pacote));
     p->origem = myRouter->id;
+    myRouter->numMessage =+ 1;
+    p->numMessageRouter = myRouter->numMessage;
+    printf("sequencia: %d\n",p->numMessageRouter );
     while (1){
         otherRouter = readRouter('d');
         p->destino = otherRouter->id;
@@ -218,9 +224,9 @@ void *ouvir(void *ser){
             printf("\n\n *** DESTINO FINAL!!! ***\n");
             printf("\nMensagem recebida IP: %s, PORTA: %d\n", inet_ntoa(si_other.sin_addr), ntohs(si_other.sin_port));
             printf("[ORIGEM]: %d \t [DESTINO]: %d\n" , pRecebido->origem, pRecebido->destino);
-            printf("[MENSAGEM]: %s\n" , pRecebido->mensagem);
+            printf("[SEQUENCIA]: %d \t [MENSAGEM]: %s\n" ,pRecebido->numMessageRouter, pRecebido->mensagem);
         } else {
-            printf("Roteador %d encaminhando mensagem com # sequência N para o destino %d enviada por %d\n",myRouter->id,pRecebido->destino,pRecebido->origem);
+            printf("Roteador %d encaminhando mensagem com # sequência %d para o destino %d enviada por %d\n",myRouter->id,pRecebido->numMessageRouter,pRecebido->destino,pRecebido->origem);
             encaminhar(proximoSalto(pRecebido->destino), pRecebido);
         }
         if(sendto(s, pRecebido, recv_len, 0, (struct sockaddr*) &si_other, slen) == -1)
