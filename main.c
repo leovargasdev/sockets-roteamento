@@ -139,7 +139,7 @@ void die(char *s){
 roteador *proximoSalto(int dest){
     int tabela[quant][2],proxId = -1,count = dest - 1;
     dijstra(tabela);
-    tabelaDijs(tabela);
+    //tabelaDijs(tabela);
     //printf("Custo: %d \n",tabela[count][1] );
     while(1) {
         //printf("%d <<",count+1);
@@ -153,7 +153,7 @@ roteador *proximoSalto(int dest){
     }else{
         proxId += 1;
     }
-    printf("\nDestino %d- Está indo para %d\n", dest,proxId);
+    //printf("\nDestino %d- Está indo para %d\n", dest,proxId);
     return getRouter(proxId);
 }
 
@@ -184,11 +184,11 @@ void *mandar(void *cli){
     while (1){
         otherRouter = readRouter('d');
         p->destino = otherRouter->id;
-        proximoSalto(otherRouter->id);
         if(otherRouter){
             printf("Mensagem: ");
             setbuf(stdin, NULL); //limpa buffer
             fgets(p->mensagem, BUFLEN, stdin);
+            otherRouter = proximoSalto(otherRouter->id);
             encaminhar(otherRouter, p);
         } else {
             printf("Digite um roteador válido\n");
@@ -220,7 +220,8 @@ void *ouvir(void *ser){
             printf("[ORIGEM]: %d \t [DESTINO]: %d\n" , pRecebido->origem, pRecebido->destino);
             printf("[MENSAGEM]: %s\n" , pRecebido->mensagem);
         } else {
-            proximoSalto(pRecebido->destino);
+            printf("Roteador %d encaminhando mensagem com # sequência N para o destino %d enviada por %d\n",myRouter->id,pRecebido->destino,pRecebido->origem);
+            encaminhar(proximoSalto(pRecebido->destino), pRecebido);
         }
         if(sendto(s, pRecebido, recv_len, 0, (struct sockaddr*) &si_other, slen) == -1)
         die("sendto()");
