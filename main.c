@@ -7,13 +7,14 @@
 #include <unistd.h>
 
 #define BUFLEN 100  //Max length of buffer
-#define PACOTE_TAM 108
+#define PACOTE_TAM 113
 
 int quant;
 
 struct PacoteDados{   //Struct da mensagem para ser enviada
     int origem;
     int destino;
+    char typeMsg;
     char mensagem[BUFLEN];
     int numMessageRouter;
 }; typedef struct PacoteDados pacote;
@@ -140,9 +141,9 @@ void die(char *s){
 }
 
 roteador *proximoSalto(int dest){
-    int tabela[quant][2],proxId = -1,count = dest - 1;
+    int tabela[quant][2], proxId = -1, count = dest - 1;
     dijstra(tabela);
-    //tabelaDijs(tabela);
+    // tabelaDijs(tabela);
     //printf("Custo: %d \n",tabela[count][1] );
     while(1) {
         //printf("%d <<",count+1);
@@ -164,7 +165,7 @@ void encaminhar(roteador *r, pacote *pac){
     struct sockaddr_in si_other;
     int s, i, slen=sizeof(si_other);
     if((s=socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) == -1)
-    die("socket");
+        die("socket");
     memset((pacote *) &si_other, 0, sizeof(si_other));
     si_other.sin_family = AF_INET;
     si_other.sin_port = htons(r->porta);
@@ -173,10 +174,13 @@ void encaminhar(roteador *r, pacote *pac){
         exit(1);
     }
     if(sendto(s, pac, PACOTE_TAM, 0, (struct sockaddr *) &si_other, slen)==-1)
-    die("sendto()");
+        die("sendto()");
     memset(pac,'\0', PACOTE_TAM);
-    if(recvfrom(s, pac, PACOTE_TAM, 0, (struct sockaddr *) &si_other, &slen) == -1)
-    die("recvfrom()");
+    if(pac->typeMsg == 'N') {
+        if(recvfrom(s, pac, PACOTE_TAM, 0, (struct sockaddr *) &si_other, &slen) == -1){
+            die("recvfrom()");
+        }
+    }
     close(s);
 }
 
@@ -184,16 +188,17 @@ void *mandar(void *cli){
     roteador *otherRouter;
     pacote *p = (pacote *) malloc(sizeof(pacote));
     p->origem = myRouter->id;
-    myRouter->numMessage =+ 1;
-    p->numMessageRouter = myRouter->numMessage;
-    printf("sequencia: %d\n",p->numMessageRouter );
     while (1){
         otherRouter = readRouter('d');
         p->destino = otherRouter->id;
+        p->numMessageRouter = 0;
         if(otherRouter){
             printf("Mensagem: ");
             setbuf(stdin, NULL); //limpa buffer
             fgets(p->mensagem, BUFLEN, stdin);
+            myRouter->numMessage++;
+            p->numMessageRouter = myRouter->numMessage;
+            p->typeMsg = 'N';
             otherRouter = proximoSalto(otherRouter->id);
             encaminhar(otherRouter, p);
         } else {
@@ -208,29 +213,42 @@ void *ouvir(void *ser){
     struct sockaddr_in si_me, si_other;
     int s, i, slen = sizeof(si_other), recv_len;
     if((s=socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) == -1)
-    die("socket");
+        die("socket");
     memset((pacote *) &si_me, 0, sizeof(si_me));
     si_me.sin_family = AF_INET;
     si_me.sin_port = htons(myRouter->porta);
     si_me.sin_addr.s_addr = htonl(INADDR_ANY);
     if(bind(s, (struct sockaddr*)&si_me, sizeof(si_me)) == -1)
-    die("bind"); // Mensagem de endereço já utilizado
+        die("bind"); // Mensagem de endereço já utilizado
     while(1){
         fflush(stdout);
         memset(pRecebido,'\0', PACOTE_TAM);
         if ((recv_len = recvfrom(s, pRecebido, PACOTE_TAM, 0, (struct sockaddr *) &si_other, &slen)) == -1)
-        die("recvfrom()");
+            die("recvfrom()");
         if(pRecebido->destino == myRouter->id){
             printf("\n\n *** DESTINO FINAL!!! ***\n");
             printf("\nMensagem recebida IP: %s, PORTA: %d\n", inet_ntoa(si_other.sin_addr), ntohs(si_other.sin_port));
             printf("[ORIGEM]: %d \t [DESTINO]: %d\n" , pRecebido->origem, pRecebido->destino);
             printf("[SEQUENCIA]: %d \t [MENSAGEM]: %s\n" ,pRecebido->numMessageRouter, pRecebido->mensagem);
+            if(pRecebido->typeMsg == 'N'){
+                int destino = pRecebido->origem, origem = myRouter->id, nrmMessage = pRecebido->numMessageRouter;
+                memset(pRecebido,'\0', PACOTE_TAM);
+                pRecebido->origem = origem;
+                pRecebido->destino = destino;
+                pRecebido->numMessageRouter = nrmMessage;
+                pRecebido->typeMsg = 'C';
+                strcpy(pRecebido->mensagem,"Mensagem Recebida");
+                encaminhar(proximoSalto(pRecebido->destino), pRecebido);
+            }else if(pRecebido->typeMsg == 'C') {
+                printf("\n\n *** Mensagem Confirmação!!! ***\n");
+            }
+
         } else {
             printf("Roteador %d encaminhando mensagem com # sequência %d para o destino %d enviada por %d\n",myRouter->id,pRecebido->numMessageRouter,pRecebido->destino,pRecebido->origem);
             encaminhar(proximoSalto(pRecebido->destino), pRecebido);
         }
         if(sendto(s, pRecebido, recv_len, 0, (struct sockaddr*) &si_other, slen) == -1)
-        die("sendto()");
+            die("sendto()");
     }
     free(pRecebido);
     close(s);
@@ -244,7 +262,7 @@ int main(){
         if(myRouter) break;
         else printf("roteador inválido\n");
     }while(1);
-    int abro[2][12];
+    myRouter->numMessage = 0;
     pthread_t t1, t2;
     pthread_create(&t1, NULL, ouvir, NULL);
     sleep(0.5);
