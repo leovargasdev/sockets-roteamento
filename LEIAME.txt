@@ -1,0 +1,21 @@
+/*
+--------------UNIVERSIDADE FEDERAL DA FRONTEIRA SUL
+--Alunos: Leonardo Vargas e Marcelo Acordi
+--Disciplina: roteadores
+--2018/1
+*/
+Os arquivos de entrada devem estar na pasta de input.
+O arquivo que precisa ser compilado é o main.c. É necessário usar o comando abaixo:
+
+gcc main.c -o main -lpthread
+
+Para cada roteador que desejar ser usado deve-se usar um terminal próprio. Por exemplo,
+para usar os roteadores 1,2 e 4, é necessário abrir 3 terminais, após compilado o
+main.c, executar ./main nos três terminais e escolher cada um como um
+roteador, 1,2 e 4.
+
+ Após executado, pedirá uma vez a origem, que será o roteador do processo, e por seguinte
+ pedirá o destino e a mensagem que se deseja enviar.
+
+ Importante, caso na entrada seja passado um roteador, e ele não seja instanciado em um terminal
+ a mensagem não vai ser enviada.
