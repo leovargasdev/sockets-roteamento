@@ -20,9 +20,10 @@ No mesmo diretório do arquivo **main.c**, deve conter uma pasta input/ e nela d
 
 ### Compilação e execução ###
 Deve-se utilizadar o seguinte comando para compilar e executar o código:
+```sh
     $ gcc main.c -o main -lpthread
     $ ./main
-
+```
 ## Como utilizar ##
 Após ter tido sucesso no passo de compilação, a primeira entrada espereada pelo código é o roteador origem, no caso o roteador
 que o usuário deseja instânciar.
