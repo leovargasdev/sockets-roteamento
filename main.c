@@ -1,8 +1,8 @@
-/*  UNIVERSIDADE FEDERAL DA FRONTEIRA SUL
-    --> Alunos: Leonardo Vargas e Marcelo Acordi
-    --> Disciplina: Redes
-    --> Data: maio, 07-2018
-*/
+//  UNIVERSIDADE FEDERAL DA FRONTEIRA SUL
+//     --> Alunos: Leonardo Vargas e Marcelo Acordi
+//     --> Disciplina: Redes
+//     --> Data: maio, 07-2018
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -11,10 +11,11 @@
 #include <pthread.h>
 #include <unistd.h>
 
-#define BUFLEN 100  //Max length of buffer
-#define PACOTE_TAM 113 //Tamanho do pacote enviado pelos roteadores
-char encerar = 'n';
-int quant; //Número de roteadores
+#define BUFLEN 100      // Tamanho das mensagens em bytes
+#define PACOTE_TAM 113  // Tamanho da struct pacote em bytes
+
+int quant; // Quantidade de roteadores
+
 /* Struct da mensagem para ser enviada*/
 struct PacoteDados{
     int origem;
@@ -158,12 +159,9 @@ roteador *proximoSalto(int dest, int tabela[quant][2]){
         proxId = count;
     }
     //Estabelendo próximo baseado se precisa de um salto ou mais.
-    if(proxId == -1) {
-        proxId = dest;
-    }else{
-        proxId += 1;
-    }
-    return getRouter(proxId);
+    if(proxId != -1)
+        dest = proxId + 1;
+    return getRouter(dest);
 }
 /* Enviar mensagem para o roteador de entrada, sendo enviada pelo roteador atual ou
 tendo sido recebida de outro roteador e encaminhada.*/
@@ -188,7 +186,7 @@ void encaminhar(roteador *r, pacote *pac){
     close(s);
 }
 /* Controla o envio do roteador instanciado no processo pelo usuário,envia mensagem*/
-void *mandar(void *cli){
+void *mandar(void *a){
     int tabela[quant][2], destino = 0;
     dijstra(tabela);
     roteador *otherRouter;
@@ -201,7 +199,8 @@ void *mandar(void *cli){
             setbuf(stdin, NULL); //limpa buffer
             fgets(mensagem, BUFLEN, stdin);
             myRouter->numMessage++;
-            otherRouter = proximoSalto(otherRouter->id, tabela);
+            if(destino != myRouter->id) // Quando o destino for ele mesmo, assim economiza a operação de achar o proximo salto
+                otherRouter = proximoSalto(otherRouter->id, tabela);
             encaminhar(otherRouter, criaPacote(myRouter->id, destino, mensagem, 'N', myRouter->numMessage));
         } else {
             printf("Roteador válido\n");
@@ -211,9 +210,10 @@ void *mandar(void *cli){
 }
 /* Checar se a mensagens recebidas que foram enviadas por outrosroteadores, se é o destino final
 enviar mensagem de resposta informando que a mensagem for recebida. Caso não, encaminha a mensagem.*/
-void *ouvir(void *ser){
+void *ouvir(void *a){
     int tabela[quant][2];
     dijstra(tabela);
+    tabelaDijs(tabela);
     pacote *pRecebido = (pacote *) malloc(sizeof(pacote));
     struct sockaddr_in si_me, si_other;
     int s, i, slen = sizeof(si_other), recv_len;
@@ -230,19 +230,19 @@ void *ouvir(void *ser){
         memset(pRecebido,'\0', PACOTE_TAM);
         if ((recv_len = recvfrom(s, pRecebido, PACOTE_TAM, 0, (struct sockaddr *) &si_other, &slen)) == -1)
             die("recvfrom()");
-        if(pRecebido->typeMsg == 'C'){
+        if(pRecebido->typeMsg == 'C' && pRecebido->destino == myRouter->id){
             printf("\n\n *** MENSAGEM CONFIRMADA!!! ***\n");
         } else {
             if(pRecebido->destino == myRouter->id){
-                int destino = pRecebido->origem, nrmMessage = pRecebido->numMessageRouter;
-                printf("\n\n *** DESTINO FINAL!!! *** \n");
-                printf("\nMensagem recebida IP: %s, PORTA: %d\n", inet_ntoa(si_other.sin_addr), ntohs(si_other.sin_port));
+                int d = pRecebido->origem, nMsg = pRecebido->numMessageRouter;
+                printf("\n\n *** DESTINO FINAL!!! ***\n\n");
+                // printf("\nMensagem recebida IP: %s, PORTA: %d\n", inet_ntoa(si_other.sin_addr), ntohs(si_other.sin_port));
                 printf("[ORIGEM]: %d \t [DESTINO]: %d\n" , pRecebido->origem, pRecebido->destino);
                 printf("[SEQUENCIA]: %d \t [MENSAGEM]: %s\n" ,pRecebido->numMessageRouter, pRecebido->mensagem);
                 memset(pRecebido,'\0', PACOTE_TAM);
-                pRecebido = criaPacote(myRouter->id, destino, "Mensagem Recebida", 'C', nrmMessage);
+                pRecebido = criaPacote(myRouter->id, d, "Mensagem Recebida", 'C', nMsg);
             } else {
-                printf("Roteador %d encaminhando mensagem com # sequência %d para o destino %d enviada por %d\n",myRouter->id,pRecebido->numMessageRouter,pRecebido->destino,pRecebido->origem);
+                printf("\nRoteador %d encaminhando mensagem com # sequência %d para o destino %d enviada por %d\n", myRouter->id, pRecebido->numMessageRouter, pRecebido->destino, pRecebido->origem);
             }
             encaminhar(proximoSalto(pRecebido->destino, tabela), pRecebido);
         }
