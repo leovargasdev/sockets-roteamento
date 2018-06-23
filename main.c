@@ -31,6 +31,7 @@ struct Router{
     int numMessage;
     char ip[100];
     struct Router *prox;
+    int **tabela;
 }; typedef struct Router roteador;
 
 roteador *myRouter;     // Ponteiro para o roteador selecionado pelo usuário
@@ -66,10 +67,14 @@ void lerRoteadores(){
 }
 
 /* Faz a leitura do arquivo enlaces.config e cria a matriz de adjacência */
-void criaEnlaces(int m[quant][quant]){
-    for (int i = 0; i < quant; i++)
-        for (int h = 0; h < quant; h++)
-            m[i][h] = 0;
+void criaEnlaces(roteador *r){
+    int numR = r->id - 1;
+    for (int i = 0; i < quant; i++) {
+        for (int j = 0; j < quant; j++) {
+            r->tabela[i * quant + j] = -1;
+        }
+    }
+    r->tabela[numR * quant + numR] = 0;
     FILE *arquivo = fopen("./input/enlaces.config","r");
     if(!arquivo){
         printf("ERRO!!! Não foi possivel abrir o arquivo\n");
@@ -80,50 +85,11 @@ void criaEnlaces(int m[quant][quant]){
     while(fgets(buf, BUFLEN, arquivo) != NULL){
         n1 = atoi(strtok(buf, delimita)) - 1;
         n2 = atoi(strtok(NULL, delimita)) - 1;
-        m[n1][n2] = m[n2][n1] = atoi(strtok(NULL, delimita)); // peso do enlace
+        if(numR == n1)
+            r->tabela[n1 * quant + n2] = atoi(strtok(NULL, delimita)); // peso do enlace
+        else if(numR == n2)
+            r->tabela[n2 * quant + n1] = atoi(strtok(NULL, delimita)); // peso do enlace
     }
-}
-
-/* Imprimindo a tabela que mostra as menores distâncias entre os roteadores e o roteador do processo */
-void tabelaDijs(int result[quant][2]){
-    printf("[TABELA]:\n\tVertices            : ");
-    for(int g = 0; g < quant; g++)
-    printf("%3d  |", g+1);
-    printf("\n\tVertices anteriores : ");
-    for(int g = 0; g < quant; g++)
-    printf("%3d  |", result[g][0]+1);
-    printf("\n\tTotal               : ");
-    for(int g = 0; g < quant; g++)
-    printf("%3d  |", result[g][1]);
-    printf("\n");
-}
-
-/* Calcula e armazena em uma tabela os vértices(roteadores) anteriores e o custo de ir para outros roteadores */
-void dijstra(int tabela[quant][2]){
-    int matrix[quant][quant], visitados[quant];
-    int v = (myRouter->id-1); // Vertice de origem, que é o próprio roteador selecionado pelo usuário
-    criaEnlaces(matrix); // Cria a matriz de adjacência
-    for(int g = 0; g < quant; g++)
-        tabela[g][1] = tabela[g][0] = visitados[g] = 0; // Zera os campos da matriz e do vetor
-    int a = 0, aux, auxTotal;
-    do{
-        aux = 1234567;
-        visitados[v] = 1;
-        for(a = 0; a < quant; a++){ // Fazendo o somatorio na tabela
-            auxTotal = matrix[v][a] + tabela[v][1]; // O custo total = custo vértice atual + custo somatorio vértice anterior
-            if(matrix[v][a] != 0 && visitados[a] != 1 && (tabela[a][1] == 0 || auxTotal < tabela[a][1])){
-                tabela[a][0] = v;
-                tabela[a][1] = auxTotal;
-            }
-        }
-        for(a = 0; a < quant; a++)
-            if(visitados[a] != 1) // Busca um vértice ainda não visitado
-                if(tabela[a][1] < aux && tabela[a][1] > 0){
-                    v = a;
-                    aux = tabela[a][1];
-                }
-        if(visitados[v] == 1) return; // Significa que visitou todos os vértice
-    }while(1);
 }
 
 /* Localiza o roteador com o id correspondente a variável passada com parâmetro, caso não localizado retorna NULL */
@@ -159,21 +125,6 @@ pacote *criaPacote(int o, int d, char m[BUFLEN], char t, int n){
     return p;
 }
 
-/* Define qual é o pŕoximo roteador para encaminhar o pacote baseado no resultado do djkstra */
-roteador *proximoSalto(int dest, int tabela[quant][2]){
-    int prox = -1, count = dest - 1;
-    while(1){
-        count = tabela[count][0];
-        if(tabela[count][0] == 0 && (count == (myRouter->id-1)))
-            break;
-        prox = count;
-    }
-    if(prox != -1)
-        dest = prox + 1; // Soma-se +1 pois a contagem dos roteadores começa por 1
-    // Se não entrar no if, significa que o roteador destino é vizinho do roteador que chamou a função
-    return getRouter(dest);
-}
-
 /* Função responsável por enviar pacotes, 1º parametro: roteador(destino) onde será entregue o pacote, 2º parâmetro: pacote à ser entregue */
 void encaminhar(roteador *r, pacote *pac){
     struct sockaddr_in si_other;
@@ -199,7 +150,7 @@ void encaminhar(roteador *r, pacote *pac){
 /* Faz a função do client, controlando o envio de pacotes do roteador selecionado pelo usuário */
 void *mandar(void *a){
     int tabela[quant][2], destino = 0;
-    dijstra(tabela);
+    // dijstra(tabela);
     roteador *otherRouter;
     char mensagem[BUFLEN];
     while(1){
@@ -211,7 +162,7 @@ void *mandar(void *a){
             fgets(mensagem, BUFLEN, stdin); // Faz a leitura da mensagem do pacote
             myRouter->numMessage++; // Contador de nº de pacotes originados por este roteador
             if(destino != myRouter->id) // Quando o destino for ele mesmo, assim economiza a operação de achar o proximo salto
-                otherRouter = proximoSalto(otherRouter->id, tabela); // Localiza o proximo salto, caso os roteadores não forem vizinhos
+                // otherRouter = proximoSalto(otherRouter->id, tabela); // Localiza o proximo salto, caso os roteadores não forem vizinhos
             encaminhar(otherRouter, criaPacote(myRouter->id, destino, mensagem, 'N', myRouter->numMessage)); // Faz a configuração do pacote e envia para o destino
         } else {
             printf("Roteador válido\n");
@@ -223,8 +174,8 @@ void *mandar(void *a){
 /* Faz a função do server, fica ouvindo os pacotes direcionados para a porta do roteador selecionado pelo usuário */
 void *ouvir(void *a){
     int tabela[quant][2];
-    dijstra(tabela);
-    tabelaDijs(tabela);
+    //dijstra(tabela);
+    //tabelaDijs(tabela);
     pacote *pRecebido = (pacote *) malloc(sizeof(pacote));
     struct sockaddr_in si_me, si_other;
     int s, i, slen = sizeof(si_other), recv_len;
@@ -256,7 +207,7 @@ void *ouvir(void *a){
                 printf("\nRoteador %d encaminhando mensagem com # sequência %d para o destino %d enviada por %d\n", myRouter->id, pRecebido->numMessageRouter, pRecebido->destino, pRecebido->origem);
             }
             // Se entrou no if vai mandar um mensagem de confimação ao roteador origem, se não ele vai encaminhar o pacote para o destino
-            encaminhar(proximoSalto(pRecebido->destino, tabela), pRecebido);
+            // encaminhar(proximoSalto(pRecebido->destino, tabela), pRecebido);
         }
         if(sendto(s, pRecebido, recv_len, 0, (struct sockaddr*) &si_other, slen) == -1)
             die("sendto()");
@@ -265,22 +216,40 @@ void *ouvir(void *a){
     close(s);
 }
 
+void bellmanFort(roteador *r){
+
+}
+
 int main(){
     first = (roteador *) malloc(sizeof(roteador));
     lerRoteadores();
-    do{
-        myRouter = readRouter('o');
-        if(myRouter) break;
-        else printf("roteador inválido\n");
-    }while(1);
-    printf("[ID]: %d  [PORTA]: %d  [IP]: %s", myRouter->id, myRouter->porta, myRouter->ip);
+    // do{
+    //     myRouter = readRouter('o');
+    //     if(myRouter) break;
+    //     else printf("roteador inválido\n");
+    // }while(1);
+    for(myRouter = first->prox; myRouter != NULL; myRouter = myRouter->prox){
+        myRouter->tabela = (int **) malloc(sizeof (int *) * (quant*quant));
+        printf("Roteador: %d\n", myRouter->id);
+        criaEnlaces(myRouter);
+        for (int i = 0; i < quant; i++) {
+            for (int j = 0; j < quant; j++) {
+                printf("%d\t", myRouter->tabela[i * quant + j]);
+            }
+            printf("\n");
+        }
+        printf("\n\n");
+    }
+
+    // printf("[ID]: %d  [PORTA]: %d  [IP]: %s", myRouter->id, myRouter->porta, myRouter->ip);
+    /*
     pthread_t t1, t2;
-    pthread_create(&t1, NULL, ouvir, NULL);
+     pthread_create(&t1, NULL, ouvir, NULL);
     sleep(0.5);
     pthread_create(&t2, NULL, mandar, NULL);
     pthread_join(t1, NULL);
     pthread_join(t2, NULL);
     free(myRouter);
-    free(first);
+    free(first); */
     exit(0);
 }
