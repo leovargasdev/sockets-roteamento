@@ -12,6 +12,8 @@
 pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 #define BUFLEN 100      // Tamanho das mensagens em bytes
 #define PACOTE_TAM 113  // Tamanho da struct pacote em bytes
+#define SAIR 0
+#define CONTINUAR 1
 
 int quant;              // Quantidade de roteadores
 
@@ -222,24 +224,20 @@ void *preparaMeuVetor(void *a){
     int s, slen = sizeof(si_other), meuRot = myRouter->id - 1;
     int vetInt[quant], vizinhos[quant];
     for (int j = 0; j < quant; j++) {
-        if(myRouter->tabela[meuRot * quant + j] != -1){
-            vizinhos[j] = 1;
-            // printf("Roteador %d eh vizinho do roteador %d VALOR: %d\n", (meuRot+1), (j+1), myRouter->tabela[meuRot * quant + j]);
-        }else{
-            // printf("Roteador %d nao eh vizinho do roteador %d\n", (meuRot+1), (j+1));
-            vizinhos[j] = 0;
-        }
+        if(myRouter->tabela[meuRot * quant + j] != -1)
+            vizinhos[j] = 1; // Eh vizinho
+        else
+            vizinhos[j] = 0; // Não eh vizinho
     }
     while (1){
         for(int i= 0; i < quant; i++){
             if(vizinhos[i]){
                 r = getRouter(i+1);
-                for (int j = 0; j < quant; j++) {
+                for (int j = 0; j < quant; j++) // Atualiza o vetor à ser enviado
                     vetInt[j] = myRouter->tabela[meuRot * quant + j];
-                }
-                printf("Mandando para o Roteador: %d\n\n", r->id);
+                // printf("Mandando para o Roteador: %d\n\n", r->id);
                 if((s = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) == -1)
-                die("socket");
+                    die("socket");
                 memset((int *) &si_other, 0, sizeof(si_other));
                 si_other.sin_family = AF_INET;
                 si_other.sin_port = htons(r->porta); // Configura a porta do roteador destino
@@ -248,90 +246,81 @@ void *preparaMeuVetor(void *a){
                     exit(1);
                 }
                 if(sendto(s, vetInt, quant*4, 0, (struct sockaddr *) &si_other, slen)==-1)
-                die("sendto()");
+                    die("sendto()");
             }
         }
-        sleep(10);
+        sleep(15);
     }
     close(s);
     free(r);
 }
 
-void *bellmanFort(void *n){
-    int *tmp=(int*)n;
-    int numRouter, aux = 0, aux2 = 0;
-    for(int i = 0; i < quant; i++) {
-        if(tmp[i] == 0)
-            numRouter = i;
-    }
-    int persistir = 1;
+void *bellmanFort(void *idRoteadoVizinho){
+    int rVizinho = (int*) idRoteadoVizinho;
+    int aux, rMeu = (myRouter->id-1), persistir = CONTINUAR, p1, p2;
+    int p3 = (rVizinho * quant) + rMeu; // Meu custo no vetor distância do vizinho
     do{
-        // printf("numRouter: %d persistindo\n", numRouter+1);
         if(pthread_mutex_trylock(&mutex)==0){
-
-            for (int i = 0; i < quant; i++) {
-                for (int j = 0; j < quant; j++) {
-                    if(i == numRouter) {
-                        myRouter->tabela[i* quant +j] = tmp[j];
-                    }
+            for (int i = 0; i < quant; i++){
+                p1 = (rVizinho * quant) + i; //Percorrendo a linha do vetor distância do vizinho
+                p2 = (rMeu * quant) + i; //Percorrendo meus custos
+                if(rMeu == i || myRouter->tabela[p1] == -1)
+                    continue;
+                aux = ((int) myRouter->tabela[p3]) + ((int) myRouter->tabela[p1]);
+                if(aux < myRouter->tabela[p2]){
+                    myRouter->tabela[p2] = aux;
                 }
-                aux2 = myRouter->id - 1;
-                if(aux2 != i && tmp[i] > -1){
-                    aux = tmp[aux2] + tmp[i];
-                    if(aux < myRouter->tabela[aux2* quant +i]){
-                        myRouter->tabela[aux2* quant +i] = aux;
-                    }
-                }
-
             }
-            printf("Printando tabela aberta\n");
-            for (int i = 0; i < quant; i++) {
-                for (int j = 0; j < quant; j++) {
-                    printf("%d\t", myRouter->tabela[i * quant + j]);
-                }
-                printf("\n");
-            }
-            printf("---------------------\n");
         }
-        persistir = 0;
+        persistir = SAIR;
         pthread_mutex_unlock(&mutex);
     }while(persistir);
-    // printf("numRouter: %d saiu\n", numRouter+1);
+    // // PRINT DA TABELA
+    printf("[TABELA]:\n");
+    for (int i = 0; i < quant; i++) {
+        for (int j = 0; j < quant; j++) {
+            printf("%d\t", myRouter->tabela[i * quant + j]);
+        }
+        printf("\n");
+    }
+    printf("\n -  -  -  -  -  -  -  -  -  -  -\n");
 }
+
 void *atualizaDistancias(void *a){
     int *vetorVizinho = (int *) malloc(sizeof (int)*quant);
     struct sockaddr_in si_me, si_other;
-    int s, i, slen = sizeof(si_other), recv_len;
+    int s, i, slen = sizeof(si_other), recv_len, rVizinho;
     if((s=socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) == -1)
-    die("socket");
+        die("socket");
     memset((pacote *) &si_me, 0, sizeof(si_me));
     si_me.sin_family = AF_INET;
     si_me.sin_port = htons(myRouter->porta); // Configura a porta do roteador selecionado pelo usuário
     si_me.sin_addr.s_addr = htonl(INADDR_ANY);
     pthread_t abigos[quant];
-    int nThread = 0;
     if(bind(s, (struct sockaddr*)&si_me, sizeof(si_me)) == -1)
-    die("bind"); // Mensagem de endereço já utilizado
+        die("bind"); // Mensagem de endereço já utilizado
     while(1){
         fflush(stdout);
         memset(vetorVizinho,'\0', quant*4);
         if ((recv_len = recvfrom(s, vetorVizinho, quant*4, 0, (struct sockaddr *) &si_other, &slen)) == -1)
-        die("recvfrom()");
-        printf("Recebi um vetor distância\n");
-        for(int i = 0; i < quant; i++) {
-            if(vetorVizinho[i] == 0)
-            nThread = i;
-        }
-        pthread_create(&abigos[nThread], NULL, bellmanFort, (void *) vetorVizinho);
-        sleep(2);
-        printf("O roteador %d ativou a thread dele\n", nThread+1);
+            die("recvfrom()");
+        for(int i = 0; i < quant; i++)
+            if(vetorVizinho[i] == 0){
+                rVizinho = i; // Acha o roteador que eviou o vetor distância
+                break;
+            }
+
+        for(int i = 0; i < quant; i++) // Atualiza o vetor distância recebido
+            myRouter->tabela[rVizinho* quant +i] = vetorVizinho[i];
+
+        pthread_create(&abigos[rVizinho], NULL, bellmanFort, (void *) rVizinho);
+
         if(sendto(s, vetorVizinho, recv_len, 0, (struct sockaddr*) &si_other, slen) == -1)
-        die("sendto()");
+            die("sendto()");
     }
     free(vetorVizinho);
     close(s);
 }
-
 
 int main(){
     first = (roteador *) malloc(sizeof(roteador));
@@ -342,33 +331,12 @@ int main(){
         else printf("roteador inválido\n");
     }while(1);
     myRouter->tabela = (int **) malloc(sizeof (int *) * (quant*quant));
-    printf("Roteador: %d\n", myRouter->id);
     criaEnlaces(myRouter);
-    for (int i = 0; i < quant; i++) {
-        for (int j = 0; j < quant; j++) {
-            printf("%d\t", myRouter->tabela[i * quant + j]);
-        }
-        printf("\n");
-    }
     pthread_t t3, t4;
-
     pthread_create(&t3, NULL, atualizaDistancias, NULL);
     pthread_create(&t4, NULL, preparaMeuVetor, NULL);
     pthread_join(t3, NULL);
     pthread_join(t4, NULL);
-
-    // for(myRouter = first->prox; myRouter != NULL; myRouter = myRouter->prox){
-    //     myRouter->tabela = (int **) malloc(sizeof (int *) * (quant*quant));
-    //     printf("Roteador: %d\n", myRouter->id);
-    //     criaEnlaces(myRouter);
-    //     for (int i = 0; i < quant; i++) {
-    //         for (int j = 0; j < quant; j++) {
-    //             printf("%d\t", myRouter->tabela[i * quant + j]);
-    //         }
-    //         printf("\n");
-    //     }
-    //     printf("\n\n");
-    // }
 
     // printf("[ID]: %d  [PORTA]: %d  [IP]: %s", myRouter->id, myRouter->porta, myRouter->ip);
     /*
